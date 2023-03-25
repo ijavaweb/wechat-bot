@@ -29,12 +29,9 @@ func NewUserMessageHandler() MessageHandlerInterface {
 // ReplyText 发送文本消息到群
 func (g *UserMessageHandler) ReplyText(msg *openwechat.Message) error {
 	// 接收私聊消息
-	sender, err := msg.Sender()
-	log.Printf("Received User %v Text Msg : %v", sender.NickName, msg.Content)
-
+	_, err := msg.Sender()
 	// 向GPT发起请求
-	requestText := strings.TrimSpace(msg.Content)
-	requestText = strings.Trim(msg.Content, "\n")
+	requestText := strings.Trim(strings.TrimSpace(msg.Content), "\n")
 	reply, err := service.Completions(requestText)
 	if err != nil {
 		log.Printf("service request error: %v \n", err)
@@ -44,7 +41,6 @@ func (g *UserMessageHandler) ReplyText(msg *openwechat.Message) error {
 	if reply == "" {
 		return nil
 	}
-
 	// 回复用户
 	reply = strings.TrimSpace(reply)
 	reply = strings.Trim(reply, "\n")

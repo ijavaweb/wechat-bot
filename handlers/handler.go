@@ -30,7 +30,6 @@ func init() {
 
 // Handler 全局处理入口
 func Handler(msg *openwechat.Message) {
-	log.Printf("hadler Received msg : %v", msg.Content)
 	// 处理群消息
 	if msg.IsSendByGroup() {
 		handlers[GroupHandler].handle(msg)
@@ -47,7 +46,6 @@ func Handler(msg *openwechat.Message) {
 			}
 		}
 	}
-
 	// 私聊
 	handlers[UserHandler].handle(msg)
 }
