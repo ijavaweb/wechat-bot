@@ -3,10 +3,14 @@ package service
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/869413421/wechatbot/config"
+	"fmt"
+	"github.com/869413421/wechatbot/model"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
+	"strings"
+	"time"
 )
 
 const BASEURL = "https://api.openai.com/v1/chat/completions"
@@ -37,54 +41,60 @@ type ChatGPTRequestBody struct {
 
 
 func Completions(msg string) (string, error) {
-	requestBody := ChatGPTRequestBody{
-		Model:            "gpt-3.5-turbo",
-		Prompt:           msg,
-		MaxTokens:        2048,
-		Temperature:      0.7,
-		TopP:             1,
-		FrequencyPenalty: 0,
-		PresencePenalty:  0,
+	start := time.Now().Unix()
+	apiURL := "https://api.openai.com/v1/chat/completions"
+	messages := make([]model.Message,0)
+	messages = append(messages,model.Message{
+		Role:    "user",
+		Content: msg,
+	})
+	data := &model.OpenAIRequest{
+		Model:    "gpt-3.5-turbo",
+		Messages: messages,
 	}
-	requestData, err := json.Marshal(requestBody)
-
+	jsonData, err := json.Marshal(data)
 	if err != nil {
-		return "", err
-	}
-	log.Printf("request service json string : %v", string(requestData))
-	req, err := http.NewRequest("POST", BASEURL, bytes.NewBuffer(requestData))
-	if err != nil {
-		return "", err
+		return "",err
 	}
 
-	apiKey := config.LoadConfig().ApiKey
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+apiKey)
 	client := &http.Client{}
-	response, err := client.Do(req)
+	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return "", err
+		return "",err
 	}
-	defer response.Body.Close()
+	secret := os.Getenv("OPENAI_API_KEY")
+	if secret == "" {
+		log.Println(" empty secret")
+		return "",nil
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", secret))
 
-	body, err := ioutil.ReadAll(response.Body)
+	resp, err := client.Do(req)
 	if err != nil {
+		log.Println(err.Error())
 		return "", err
 	}
+	end := time.Now().Unix()
+	log.Printf("time cost : %v",end-start)
+	log.Println()
+	log.Println()
+	defer resp.Body.Close()
 
-	gptResponseBody := &ChatGPTResponseBody{}
-	log.Println(string(body))
-	err = json.Unmarshal(body, gptResponseBody)
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
+		log.Println(err.Error())
 		return "", err
 	}
-	var reply string
-	if len(gptResponseBody.Choices) > 0 {
-		for _, v := range gptResponseBody.Choices {
-			reply = v["text"].(string)
-			break
-		}
+	var result model.OpenAIResponse
+	err = json.Unmarshal(body, &result)
+	log.Println(result)
+	if err != nil {
+		log.Println(err.Error())
+		return "", err
 	}
-	log.Printf("gpt response text: %s \n", reply)
-	return reply, nil
+	if len(result.Choices) == 0 {
+		return "", err
+	}
+	return strings.TrimSpace(result.Choices[0].Message.Content),nil
 }
